@@ -36,7 +36,7 @@
       text-align: center;
       transition: background-color 0.4s ease, transform 0.3s ease, opacity 0.3s ease;
       position: relative;
-      opacity: 1; /* Карточка видима по умолчанию */
+      opacity: 1;
     }
 
     /* --- ПРОГРЕСС-БАР ИГРЫ --- */
@@ -71,7 +71,6 @@
       100% { transform: translateY(100vh) scale(0.5) rotate(15deg); opacity: 0; }
     }
 
-    /* Появление финального экрана без забагованного скрытия */
     .fade-in { animation: fadeInEffect 0.6s forwards ease-out; }
     @keyframes fadeInEffect { 
       0% { opacity: 0; transform: scale(0.8); }
@@ -122,7 +121,7 @@
       100% { transform: translateY(450px) rotate(360deg); opacity: 0; }
     }
 
-    /* --- ЛЕТАЮЩИЕ ИНДИКАТОРЫ ОЧКОВ (+5 / -5) --- */
+    /* ЛЕТАЮЩИЕ ИНДИКАТОРЫ ОЧКОВ */
     .floating-score {
       position: absolute;
       font-size: 24px;
@@ -136,7 +135,6 @@
       100% { opacity: 0; transform: translateY(-60px) scale(1.2); }
     }
 
-    /* СОВРЕМЕННОЕ ОКНО ДЛЯ ИНФО-ПОДСКАЗОК */
     .info-box {
       margin-top: 15px;
       padding: 12px;
@@ -162,7 +160,6 @@
       outline: none;
     }
 
-    /* КНОПКИ И ЭФФЕКТ ЖЕЛЕ */
     button {
       display: block;
       margin: 10px auto;
@@ -198,7 +195,6 @@
     button.next-btn { background: #2ecc71; margin-top: 15px; font-weight: bold; display: none; }
     button.next-btn:hover { background: #27ae60; }
 
-    /* СТАТУС БАР И СЕРДЦА */
     .status-bar {
       display: flex;
       justify-content: space-between;
@@ -231,14 +227,11 @@
       100% { transform: translateY(20px) scale(0); opacity: 0; }
     }
 
-    /* ТАЙМЕР */
     #timerDisplay {
       color: #2ecc71;
       transition: color 0.3s ease;
     }
-    #timerDisplay.timer-warning {
-      color: #e67e22;
-    }
+    #timerDisplay.timer-warning { color: #e67e22; }
     #timerDisplay.timer-panic {
       color: #e74c3c;
       animation: timerPulse 0.5s infinite alternate ease-in-out;
@@ -315,6 +308,111 @@
 </div>
 
 <script>
+// --- БЕЗОПАСНЫЙ СИНТЕЗАТОР ЗВУКОВЫХ ЭФФЕКТОВ ---
+const SoundEffects = {
+  ctx: null,
+
+  init() {
+    try {
+      if (!this.ctx) {
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      // Если контекст "спит", пробуем его разбудить кликом
+      if (this.ctx && this.ctx.state === 'suspended') {
+        this.ctx.resume();
+      }
+    } catch (e) {
+      console.log("AudioContext не поддерживается или заблокирован:", e);
+    }
+  },
+
+  playClick() {
+    this.init();
+    if (!this.ctx || this.ctx.state === 'suspended') return; // Защита от зависания
+    try {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+      gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.05);
+
+      osc.start();
+      osc.stop(this.ctx.currentTime + 0.05);
+    } catch(err) {}
+  },
+
+  playCorrect() {
+    this.init();
+    if (!this.ctx || this.ctx.state === 'suspended') return;
+    try {
+      const now = this.ctx.currentTime;
+      const notes = [523.25, 659.25, 783.99]; 
+      notes.forEach((freq, index) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now + index * 0.08);
+        gain.gain.setValueAtTime(0.15, now + index * 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + index * 0.08 + 0.3);
+
+        osc.start(now + index * 0.08);
+        osc.stop(now + index * 0.08 + 0.3);
+      });
+    } catch(err) {}
+  },
+
+  playWrong() {
+    this.init();
+    if (!this.ctx || this.ctx.state === 'suspended') return;
+    try {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(180, this.ctx.currentTime);
+      osc.frequency.linearRampToValueAtTime(70, this.ctx.currentTime + 0.4);
+      
+      gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.4);
+
+      osc.start();
+      osc.stop(this.ctx.currentTime + 0.4);
+    } catch(err) {}
+  },
+
+  playGameOver() {
+    this.init();
+    if (!this.ctx || this.ctx.state === 'suspended') return;
+    try {
+      const now = this.ctx.currentTime;
+      const notes = [300, 260, 220, 180];
+      notes.forEach((freq, index) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freq, now + index * 0.15);
+        gain.gain.setValueAtTime(0.2, now + index * 0.15);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + index * 0.15 + 0.4);
+
+        osc.start(now + index * 0.15);
+        osc.stop(now + index * 0.15 + 0.4);
+      });
+    } catch(err) {}
+  }
+};
+
 const uiTexts = {
   ru: {
     title: "Цифровая грамотность", subtitle: "Выбери уровень сложности:",
@@ -406,7 +504,6 @@ let timeLeft = 30;
 let timerId = null;
 let canClick = true;
 
-// Принудительно показываем стартовый экран при запуске скрипта
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("langScreen").style.display = "block";
 });
@@ -417,6 +514,7 @@ function selectLanguage(lang) {
     alert(uiTexts[lang].nameAlert);
     return;
   }
+  
   nickname = inputVal;
   currentLanguage = lang;
 
@@ -427,9 +525,13 @@ function selectLanguage(lang) {
 
   document.getElementById("langScreen").style.display = "none";
   document.getElementById("startScreen").style.display = "block";
+  
+  // Инициализируем аудио именно здесь (после гарантированного первого клика юзера)
+  SoundEffects.playClick();
 }
 
 function startGame(level) {
+  SoundEffects.playClick();
   questions = questionsData[currentLanguage][level];
   current = 0;
   score = 0;
@@ -543,6 +645,7 @@ function handleTimeOut() {
   if (!canClick) return;
   canClick = false;
   
+  SoundEffects.playWrong();
   const lang = currentLanguage;
   const gameCard = document.getElementById("gameScreen");
   const infoBox = document.getElementById("infoBox");
@@ -582,6 +685,7 @@ function checkAnswer(index, clickedButton) {
   }
 
   if (index === questions[current].correct) {
+    SoundEffects.playCorrect();
     score += 5;
     spawnFloatingText("+5", true);
     clickedButton.style.backgroundColor = "#2ecc71";
@@ -591,6 +695,7 @@ function checkAnswer(index, clickedButton) {
     infoBox.className = "info-box correct";
     infoBox.innerHTML = uiTexts[lang].correctAlert + questions[current].info;
   } else {
+    SoundEffects.playWrong();
     score -= 5;
     lives--;
     spawnFloatingText("-5", false);
@@ -608,6 +713,7 @@ function checkAnswer(index, clickedButton) {
 }
 
 function goToNextQuestion() {
+  SoundEffects.playClick();
   const gameCard = document.getElementById("gameScreen");
   gameCard.classList.remove("correct-flash", "wrong-flash");
 
@@ -625,6 +731,7 @@ function goToNextQuestion() {
 
 function triggerEpicGameOver() {
   clearInterval(timerId);
+  SoundEffects.playGameOver();
   const gameCard = document.getElementById("gameScreen");
   
   gameCard.classList.add("epic-game-over");
@@ -691,6 +798,7 @@ function createConfetti(target) {
 }
 
 function resetGame() {
+  SoundEffects.playClick();
   document.body.className = "";
   document.getElementById("gameScreen").className = "game";
   
